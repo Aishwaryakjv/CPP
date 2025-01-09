@@ -1,0 +1,125 @@
+#include <iostream>
+#include <vector>
+#include <memory>
+#include <thread>
+#include <mutex>
+#include <string>
+#include <chrono>
+
+// Machinery class
+class Machinery {
+private:
+    int machineryId;
+    std::string status;
+public:
+    Machinery(int id, const std::string& initialStatus = "Operational") 
+        : machineryId(id), status(initialStatus) {}
+    void updateStatus(const std::string& newStatus) {
+        status = newStatus;
+    }
+    std::string getStatus() const {
+        return status;
+    }
+    int getId() const {
+        return machineryId;
+    }
+};
+
+// Customer class
+class Customer {
+private:
+    std::string name;
+    std::shared_ptr<Machinery> machinery;
+public:
+    Customer(const std::string& customerName, std::shared_ptr<Machinery> machine) 
+        : name(customerName), machinery(machine) {}
+    std::string getName() const {
+        return name;
+    }
+    std::shared_ptr<Machinery> getMachinery() const {
+        return machinery;
+    }
+};
+
+// FleetMonitor class
+class FleetMonitor {
+private:
+    std::vector<std::shared_ptr<Machinery>> machineryData;
+    std::mutex mtx; // to stop multiple threads using the same data
+public:
+    void addMachinery(std::shared_ptr<Machinery> machinery) {
+        machineryData.push_back(machinery);
+    }
+    void monitorMachinery() {
+        // Simulate machinery monitoring
+        for (auto& machinery : machineryData) {
+            std::this_thread::sleep_for(std::chrono::seconds(2));
+            std::lock_guard<std::mutex> lock(mtx);
+            std::string newStatus;
+            while (true) {
+                std::cout << "Enter new status for machinery " << machinery->getId() << " (Options: Operational, Maintenance): ";
+                std::getline(std::cin, newStatus);
+                if (newStatus == "Operational" || newStatus == "Maintenance") {
+                    machinery->updateStatus(newStatus);  // Updating status based on user input
+                    break;
+                } else {
+                    std::cout << "Invalid option. Please enter a valid status." << std::endl;
+                }
+            }
+        }
+    }
+    const std::vector<std::shared_ptr<Machinery>>& getMachineryData() const {
+        return machineryData;
+    }
+};
+
+// FleetService class
+class FleetService {
+public:
+    void checkAndServiceMachinery(const std::vector<std::shared_ptr<Customer>>& customers) {
+        for (const auto& customer : customers) {
+            auto machinery = customer->getMachinery();
+            if (machinery->getStatus() != "Operational") {
+                std::cout << "Customer " << customer->getName() << " needs to service machinery " 
+                          << machinery->getId() << std::endl;
+            }
+        }
+    }
+};
+
+int main() {
+    FleetMonitor monitor;
+    FleetService fleetService;
+    // Add machinery
+    auto machinery1 = std::make_shared<Machinery>(1);
+    auto machinery2 = std::make_shared<Machinery>(2);
+    auto machinery3 = std::make_shared<Machinery>(3);
+    monitor.addMachinery(machinery1);
+    monitor.addMachinery(machinery2);
+    monitor.addMachinery(machinery3);
+    // Add customers
+    std::vector<std::shared_ptr<Customer>> customers;
+    customers.push_back(std::make_shared<Customer>("Aishwarya", machinery1));
+    customers.push_back(std::make_shared<Customer>("Yamini", machinery2));
+    customers.push_back(std::make_shared<Customer>("Vijay", machinery3));
+    
+    // Print machinery and customer data
+    std::cout << "CATERPILLAR Machinery Data:" << std::endl;
+    for (const auto& machinery : monitor.getMachineryData()) {
+        std::cout << "CAT Machinery ID: " << machinery->getId() << ", Status: " << machinery->getStatus() << std::endl;
+    }
+    std::cout << "\nCustomer Data:" << std::endl;
+    for (const auto& customer : customers) {
+        std::cout << "Customer Name: " << customer->getName() << ", Machinery ID: " << customer->getMachinery()->getId() << std::endl;
+    }
+     
+    std::cout<<std::endl;
+    
+    // Start monitoring in separate thread
+    std::thread monitorThread(&FleetMonitor::monitorMachinery, &monitor);
+    monitorThread.join(); // Wait for the monitoring thread to complete
+    // Check and service machinery
+    fleetService.checkAndServiceMachinery(customers);
+
+    return 0;
+}
